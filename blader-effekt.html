@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blader-effekt</title>
+<style>
+  :root {
+    --kort-bredde: 280px;
+    --kort-hoejde: 380px;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at top, #2b2f45, #14151f);
+    font-family: system-ui, sans-serif;
+    color: #fff;
+  }
+
+  /* Stakken med billeder */
+  .stak {
+    position: relative;
+    width: var(--kort-bredde);
+    height: var(--kort-hoejde);
+    perspective: 1200px;          /* giver 3D-dybde når man bladrer */
+  }
+
+  .kort {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, .45);
+    transform-origin: left center; /* "ryggen" på bladet er i venstre side */
+    transition: transform .6s cubic-bezier(.4, 0, .2, 1),
+                opacity .6s ease;
+    backface-visibility: hidden;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .kort img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+  }
+
+  /* Hvert kort lægges en lille smule forskudt = stak-følelse */
+  .kort:nth-child(1) { transform: translate(0, 0) rotate(0deg); }
+  .kort:nth-child(2) { transform: translate(6px, 6px) rotate(2deg); }
+  .kort:nth-child(3) { transform: translate(12px, 12px) rotate(4deg); }
+  .kort:nth-child(4) { transform: translate(18px, 18px) rotate(6deg); }
+
+  /* Når man har "bladret" et kort væk: det vipper til siden og forsvinder */
+  .kort.bladret {
+    transform: translateX(40px) rotateY(-115deg);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 28px;
+    opacity: .6;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="stak" id="stak">
+    <!-- Klik på det øverste kort for at bladre videre -->
+    <div class="kort"><img src="https://picsum.photos/id/1015/280/380" alt=""></div>
+    <div class="kort"><img src="https://picsum.photos/id/1025/280/380" alt=""></div>
+    <div class="kort"><img src="https://picsum.photos/id/1043/280/380" alt=""></div>
+    <div class="kort"><img src="https://picsum.photos/id/1062/280/380" alt=""></div>
+  </div>
+
+  <p class="hint">Klik på billedet for at bladre →</p>
+
+  <script>
+    const stak = document.getElementById('stak');
+
+    stak.addEventListener('click', (e) => {
+      const kort = e.target.closest('.kort');
+      if (!kort) return;
+
+      // Bladr det øverste kort væk, og send det bagest i stakken igen
+      kort.classList.add('bladret');
+
+      setTimeout(() => {
+        kort.classList.remove('bladret');
+        stak.prepend(kort); // tilbage bagest, så loopet fortsætter
+      }, 600);
+    });
+  </script>
+
+</body>
+</html>
