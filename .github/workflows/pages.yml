@@ -1,0 +1,46 @@
+name: Udgiv spil til GitHub Pages
+
+on:
+  push:
+    branches:
+      - cursor/roskilde-regndraabe-spil-c0b5
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Hent kode
+        uses: actions/checkout@v4
+
+      - name: Byg site-mappe
+        run: |
+          mkdir -p _site
+          cp regndraabe-fangst.html _site/index.html
+          cp regndraabe-fangst.html _site/regndraabe-fangst.html
+
+      - name: Konfigurér Pages (aktivér hvis nødvendigt)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artefakt
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy til Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
