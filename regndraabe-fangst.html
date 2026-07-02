@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Regndråbe-fangst · Roskilde Festival</title>
 <style>
   :root {
@@ -22,13 +22,21 @@
     background: #0c0d14;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    /* Stop scroll / pull-to-refresh / zoom-gestik på mobil */
+    touch-action: none;
+    overscroll-behavior: none;
+    position: fixed;
+    width: 100%;
   }
 
   #scene {
     display: block;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;   /* undgå at mobil-browserlinjer klipper spillet */
     cursor: none;
+    touch-action: none;
   }
 
   /* ---------- HUD ---------- */
@@ -264,6 +272,37 @@
     opacity: .3;
     pointer-events: none;
   }
+
+  /* Respektér mobilens "safe areas" (hak/hjørner) */
+  .panel { top: calc(20px + env(safe-area-inset-top)); }
+  #score-panel { left: calc(16px + env(safe-area-inset-left)); }
+  #drik-panel  { right: calc(16px + env(safe-area-inset-right)); }
+
+  /* ---------- Mobil-tilpasning ---------- */
+  @media (max-width: 620px), (pointer: coarse) {
+    .panel { padding: 8px 12px; border-radius: 12px; }
+    .value { font-size: 26px; }
+    .label { font-size: 10px; letter-spacing: .12em; }
+    #combo { top: calc(74px + env(safe-area-inset-top)); font-size: 14px; }
+    #maaler-wrap { width: min(360px, 82vw); bottom: calc(16px + env(safe-area-inset-bottom)); }
+    #maaler-tekst { font-size: 10px; }
+    .fod { display: none; }
+    .kort { padding: 30px 22px; border-radius: 22px; }
+    .undertekst { font-size: 15px; }
+    .knap { font-size: 18px; padding: 15px 32px; }
+    .fod { font-size: 10px; padding: 0 10px; text-align: center; }
+    #slut-stats { gap: 20px; }
+    #slut-stats .stat .n { font-size: 34px; }
+  }
+
+  /* Landskab på lav telefon: hold HUD kompakt */
+  @media (max-height: 430px) and (pointer: coarse) {
+    #maaler-wrap { bottom: 8px; width: min(300px, 60vw); }
+    .value { font-size: 22px; }
+    .kort { padding: 18px 22px; }
+    h1 { font-size: 30px; }
+    .undertekst { margin: 8px 0 14px; }
+  }
 </style>
 </head>
 <body>
@@ -338,8 +377,13 @@
     //  Grundopsætning
     // ---------------------------------------------------------------
     const canvas = document.getElementById('scene');
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Er vi på en (mindre kraftig) mobil? Så skruer vi lidt ned for tunge effekter.
+    const ER_MOBIL = window.matchMedia('(pointer: coarse)').matches ||
+                     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !ER_MOBIL });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, ER_MOBIL ? 1.75 : 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -354,10 +398,12 @@
     camera.position.set(0, 6.2, 15);
     camera.lookAt(0, 4, 0);
 
-    // Spilfelt-grænser (x) hvor koppen og dråberne lever
-    const GRÆNSE = 8.5;
+    // Spilfelt-grænser (x) hvor koppen og dråberne lever.
+    // Beregnes dynamisk ud fra skærmforholdet, så det også passer i portræt på mobil.
+    let GRÆNSE = 8.5;
     const GULV_Y = 0;
     const KOP_Y = 1.7;
+    const SPILLE_Z = 6; // z-plan hvor kop + dråber lever
 
     // ---------------------------------------------------------------
     //  Lys
@@ -368,7 +414,7 @@
     const sol = new THREE.DirectionalLight(0xffe8c7, 1.5);
     sol.position.set(-9, 18, 10);
     sol.castShadow = true;
-    sol.shadow.mapSize.set(2048, 2048);
+    sol.shadow.mapSize.set(ER_MOBIL ? 1024 : 2048, ER_MOBIL ? 1024 : 2048);
     sol.shadow.camera.near = 1;
     sol.shadow.camera.far = 60;
     sol.shadow.camera.left = -16;
@@ -523,7 +569,8 @@
     const hovedGeo = new THREE.SphereGeometry(.35, 8, 8);
     const kropGeo = new THREE.CapsuleGeometry(.32, .9, 4, 8);
     const farver = [0x2b6cb0, 0xd53f8c, 0x38a169, 0xdd6b20, 0x805ad5, 0xe53e3e, 0x319795];
-    for (let i = 0; i < 90; i++) {
+    const ANTAL_PUBLIKUM = ER_MOBIL ? 45 : 90;
+    for (let i = 0; i < ANTAL_PUBLIKUM; i++) {
       const g = new THREE.Group();
       const mat = new THREE.MeshStandardMaterial({ color: farver[i % farver.length], roughness: .8 });
       const krop = new THREE.Mesh(kropGeo, mat);
@@ -655,7 +702,8 @@
     const rGeo = new THREE.CylinderGeometry(.02, .02, 1.2, 4);
     const rMat = new THREE.MeshBasicMaterial({ color: 0xaad4ff, transparent: true, opacity: .35 });
     const bgDråber = [];
-    for (let i = 0; i < 220; i++) {
+    const ANTAL_BG_REGN = ER_MOBIL ? 110 : 220;
+    for (let i = 0; i < ANTAL_BG_REGN; i++) {
       const m = new THREE.Mesh(rGeo, rMat);
       m.position.set((Math.random()-.5)*70, Math.random()*30, -6 - Math.random()*30);
       m.userData.v = 18 + Math.random()*12;
@@ -717,12 +765,20 @@
 
     function pegeTilVerden(klientX) {
       const nx = (klientX / window.innerWidth) * 2 - 1; // -1..1
-      målX = nx * GRÆNSE;
+      målX = Math.max(-GRÆNSE, Math.min(GRÆNSE, nx * GRÆNSE));
     }
-    window.addEventListener('pointermove', e => { if (tilstand.kører) pegeTilVerden(e.clientX); });
-    window.addEventListener('touchmove', e => {
+    // Pointer events dækker både mus og touch. Vi lytter på canvas, så knapper i
+    // overlays ikke bliver forstyrret.
+    canvas.addEventListener('pointerdown', e => { if (tilstand.kører) pegeTilVerden(e.clientX); });
+    canvas.addEventListener('pointermove', e => { if (tilstand.kører) pegeTilVerden(e.clientX); });
+    // Ekstra sikring mod scroll på ældre mobil-browsere uden fuld pointer-support.
+    canvas.addEventListener('touchmove', e => {
       if (tilstand.kører && e.touches[0]) { pegeTilVerden(e.touches[0].clientX); e.preventDefault(); }
     }, { passive: false });
+    canvas.addEventListener('touchstart', e => {
+      if (tilstand.kører && e.touches[0]) { pegeTilVerden(e.touches[0].clientX); e.preventDefault(); }
+    }, { passive: false });
+    window.addEventListener('contextmenu', e => e.preventDefault());
 
     window.addEventListener('keydown', e => {
       if (e.key === 'ArrowLeft')  tastVenstre.ned = true;
@@ -892,13 +948,34 @@
     // ---------------------------------------------------------------
     //  Resize
     // ---------------------------------------------------------------
+    // Find hvor bredt spillefeltet må være, så kop + dråber altid er synlige
+    // — også i smalt portræt-format på en telefon.
+    const _ray = new THREE.Raycaster();
+    const _spillePlan = new THREE.Plane(new THREE.Vector3(0, 0, 1), -SPILLE_Z);
+    const _hit = new THREE.Vector3();
+    function beregnGrænse() {
+      let bredest = 0;
+      for (const nx of [-1, 1]) {
+        _ray.setFromCamera(new THREE.Vector2(nx, 0), camera);
+        if (_ray.ray.intersectPlane(_spillePlan, _hit)) {
+          bredest = Math.max(bredest, Math.abs(_hit.x));
+        }
+      }
+      // hold plads til koppens radius, og sæt et fornuftigt minimum
+      GRÆNSE = Math.max(2.6, (bredest || 8.5) - 1.3);
+    }
+
     function resize() {
       const w = window.innerWidth, h = window.innerHeight;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      beregnGrænse();
+      // hold kop og mål inden for de (måske nye) grænser
+      målX = Math.max(-GRÆNSE, Math.min(GRÆNSE, målX));
     }
     window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 200));
     resize();
     opdaterHUD();
     tick();
