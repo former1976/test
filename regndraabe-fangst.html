@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regndråbe-fangst · Roskilde Festival</title>
+<style>
+  :root {
+    --orange: #ff5b00;
+    --orange-lys: #ff8a3d;
+    --graa: #14151f;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: #fff;
+    background: #0c0d14;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #scene {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: none;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .panel {
+    position: absolute;
+    top: 20px;
+    padding: 12px 18px;
+    border-radius: 16px;
+    background: rgba(12, 13, 20, .55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  }
+
+  #score-panel { left: 20px; }
+  #drik-panel  { right: 20px; text-align: right; }
+
+  .label {
+    font-size: 12px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .7;
+  }
+
+  .value {
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.05;
+  }
+
+  #score-value { color: #6fd0ff; }
+  #drik-value  { color: var(--orange-lys); }
+
+  #combo {
+    position: fixed;
+    top: 96px;
+    left: 20px;
+    z-index: 10;
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffd166;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .25s, transform .25s;
+    text-shadow: 0 2px 8px rgba(0,0,0,.6);
+  }
+  #combo.vis { opacity: 1; transform: translateY(0); }
+
+  /* Regnmåler nederst */
+  #maaler-wrap {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    width: min(420px, 70vw);
+    z-index: 10;
+    pointer-events: none;
+    text-align: center;
+  }
+  #maaler {
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.14);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.15);
+  }
+  #maaler-fyld {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6fd0ff, #3a9bff);
+    transition: width .2s ease;
+  }
+  #maaler-tekst {
+    margin-top: 6px;
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    opacity: .6;
+  }
+
+  /* ---------- Drik-flash ---------- */
+  #drik-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #drik-flash .boks {
+    font-size: clamp(60px, 14vw, 180px);
+    font-weight: 900;
+    letter-spacing: .04em;
+    color: #fff;
+    text-shadow: 0 0 40px var(--orange), 0 8px 30px rgba(0,0,0,.6);
+    transform: scale(.6) rotate(-6deg);
+  }
+  #drik-flash.slaa {
+    animation: drikPop .7s ease-out;
+  }
+  @keyframes drikPop {
+    0%   { opacity: 0; }
+    12%  { opacity: 1; }
+    18%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  #drik-flash.slaa .boks {
+    animation: drikScale .7s ease-out;
+  }
+  @keyframes drikScale {
+    0%   { transform: scale(.4) rotate(-10deg); }
+    18%  { transform: scale(1.15) rotate(4deg); }
+    100% { transform: scale(1.4) rotate(-3deg); }
+  }
+
+  /* ---------- Overlays (start / slut) ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 50% 30%, rgba(255,91,0,.35), rgba(8,9,15,.92));
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    text-align: center;
+    padding: 24px;
+  }
+  .overlay.skjul { display: none; }
+
+  .kort {
+    max-width: 560px;
+    padding: 40px 36px;
+    border-radius: 26px;
+    background: rgba(16, 17, 26, .7);
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 30px 80px rgba(0,0,0,.55);
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    color: #0c0d14;
+    background: var(--orange);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-weight: 800;
+    margin-bottom: 18px;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: clamp(34px, 6vw, 58px);
+    line-height: 1;
+    font-weight: 900;
+    letter-spacing: -.02em;
+  }
+  h1 .accent { color: var(--orange-lys); }
+
+  .undertekst {
+    margin: 12px 0 24px;
+    font-size: 16px;
+    line-height: 1.6;
+    opacity: .85;
+  }
+  .undertekst b { color: var(--orange-lys); }
+
+  .knap {
+    pointer-events: auto;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    padding: 16px 40px;
+    border-radius: 999px;
+    color: #0c0d14;
+    background: linear-gradient(180deg, var(--orange-lys), var(--orange));
+    box-shadow: 0 12px 30px rgba(255,91,0,.45);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .knap:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 16px 40px rgba(255,91,0,.55); }
+  .knap:active { transform: translateY(0) scale(.98); }
+
+  .tast-hint {
+    margin-top: 22px;
+    font-size: 13px;
+    opacity: .6;
+    line-height: 1.7;
+  }
+  .tast-hint kbd {
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.18);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+
+  #slut-stats {
+    display: flex;
+    gap: 28px;
+    justify-content: center;
+    margin: 8px 0 26px;
+  }
+  #slut-stats .stat .t { font-size: 12px; letter-spacing:.16em; text-transform:uppercase; opacity:.6; }
+  #slut-stats .stat .n { font-size: 40px; font-weight: 900; }
+  #slut-stats .stat.g .n { color: #6fd0ff; }
+  #slut-stats .stat.d .n { color: var(--orange-lys); }
+
+  #dom-slut { font-size: 17px; margin-bottom: 22px; opacity: .9; }
+
+  .fod {
+    position: fixed;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    font-size: 11px;
+    opacity: .3;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+  <canvas id="scene"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="score-panel" class="panel">
+      <div class="label">Fanget</div>
+      <div id="score-value" class="value">0</div>
+    </div>
+    <div id="drik-panel" class="panel">
+      <div class="label">Genstande</div>
+      <div id="drik-value" class="value">0</div>
+    </div>
+    <div id="combo"></div>
+  </div>
+
+  <div id="maaler-wrap">
+    <div id="maaler"><div id="maaler-fyld"></div></div>
+    <div id="maaler-tekst">Tørhed — fyld koppen, ellers skal du drikke!</div>
+  </div>
+
+  <div id="drik-flash"><div class="boks">DRIK!</div></div>
+
+  <!-- Startskærm -->
+  <div id="start" class="overlay">
+    <div class="kort">
+      <span class="badge">Roskilde Festival</span>
+      <h1>Regndråbe-<span class="accent">fangst</span></h1>
+      <p class="undertekst">
+        Det pisser ned over Dyrskuepladsen. Fang så mange regndråber som muligt
+        i din øl-kop — men <b>hver dråbe du misser, skal du drikke en genstand!</b>
+      </p>
+      <button id="start-knap" class="knap">Kom nu i gang! 🍺</button>
+      <div class="tast-hint">
+        Styr koppen med <kbd>mus</kbd> eller <kbd>←</kbd> <kbd>→</kbd> · <kbd>touch</kbd> på mobil
+      </div>
+    </div>
+  </div>
+
+  <!-- Slutskærm -->
+  <div id="slut" class="overlay skjul">
+    <div class="kort">
+      <span class="badge">Bar-tid</span>
+      <h1>Du er <span class="accent">færdig</span>!</h1>
+      <div id="slut-stats">
+        <div class="stat g"><div class="n" id="slut-fanget">0</div><div class="t">Fanget</div></div>
+        <div class="stat d"><div class="n" id="slut-drik">0</div><div class="t">Genstande</div></div>
+      </div>
+      <div id="dom-slut"></div>
+      <button id="igen-knap" class="knap">En tur til 🍺</button>
+      <div class="tast-hint">Drik ansvarligt — og husk vand mellem øllerne.</div>
+    </div>
+  </div>
+
+  <div class="fod">Regndråbe-fangst · lavet med Three.js · fiktion, drik ansvarligt</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    // ---------------------------------------------------------------
+    //  Grundopsætning
+    // ---------------------------------------------------------------
+    const canvas = document.getElementById('scene');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x243247);
+    scene.fog = new THREE.Fog(0x33465e, 22, 70);
+
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
+    camera.position.set(0, 6.2, 15);
+    camera.lookAt(0, 4, 0);
+
+    // Spilfelt-grænser (x) hvor koppen og dråberne lever
+    const GRÆNSE = 8.5;
+    const GULV_Y = 0;
+    const KOP_Y = 1.7;
+
+    // ---------------------------------------------------------------
+    //  Lys
+    // ---------------------------------------------------------------
+    const ambient = new THREE.HemisphereLight(0xbcd3ff, 0x35271a, 0.75);
+    scene.add(ambient);
+
+    const sol = new THREE.DirectionalLight(0xffe8c7, 1.5);
+    sol.position.set(-9, 18, 10);
+    sol.castShadow = true;
+    sol.shadow.mapSize.set(2048, 2048);
+    sol.shadow.camera.near = 1;
+    sol.shadow.camera.far = 60;
+    sol.shadow.camera.left = -16;
+    sol.shadow.camera.right = 16;
+    sol.shadow.camera.top = 20;
+    sol.shadow.camera.bottom = -6;
+    sol.shadow.bias = -0.0004;
+    scene.add(sol);
+
+    // Roskilde-orange scenelys der pulserer lidt
+    const scenelys = new THREE.PointLight(0xff5b00, 0, 40, 2);
+    scenelys.position.set(0, 9, -14);
+    scene.add(scenelys);
+
+    // ---------------------------------------------------------------
+    //  Himmel (gradient-dome)
+    // ---------------------------------------------------------------
+    const himmelGeo = new THREE.SphereGeometry(90, 32, 16);
+    const himmelMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        top:    { value: new THREE.Color(0x0f1830) },
+        bund:   { value: new THREE.Color(0x5b6f88) },
+        orange: { value: new THREE.Color(0xff5b00) },
+      },
+      vertexShader: `
+        varying vec3 vPos;
+        void main(){ vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+      `,
+      fragmentShader: `
+        varying vec3 vPos;
+        uniform vec3 top; uniform vec3 bund; uniform vec3 orange;
+        void main(){
+          float h = clamp((normalize(vPos).y + 0.15) / 1.0, 0.0, 1.0);
+          vec3 col = mix(bund, top, pow(h, 0.8));
+          // orange glød ved horisonten bagude
+          float glow = smoothstep(0.35, -0.1, vPos.y/90.0) * smoothstep(0.0,-1.0, normalize(vPos).z);
+          col = mix(col, orange, glow * 0.5);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    scene.add(new THREE.Mesh(himmelGeo, himmelMat));
+
+    // ---------------------------------------------------------------
+    //  Jord (mudret festivalplads)
+    // ---------------------------------------------------------------
+    const jordCanvas = document.createElement('canvas');
+    jordCanvas.width = jordCanvas.height = 512;
+    const jc = jordCanvas.getContext('2d');
+    jc.fillStyle = '#4a5b34';
+    jc.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 5000; i++) {
+      const g = Math.random();
+      jc.fillStyle = g < .5 ? 'rgba(60,45,25,.5)' : (g < .8 ? 'rgba(90,110,55,.5)' : 'rgba(40,52,28,.6)');
+      const s = 2 + Math.random() * 6;
+      jc.fillRect(Math.random()*512, Math.random()*512, s, s);
+    }
+    // et par mudder-pletter
+    for (let i = 0; i < 40; i++) {
+      jc.fillStyle = 'rgba(48,34,18,.55)';
+      jc.beginPath();
+      jc.arc(Math.random()*512, Math.random()*512, 8+Math.random()*26, 0, Math.PI*2);
+      jc.fill();
+    }
+    const jordTex = new THREE.CanvasTexture(jordCanvas);
+    jordTex.wrapS = jordTex.wrapT = THREE.RepeatWrapping;
+    jordTex.repeat.set(6, 6);
+    jordTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+    const jord = new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 120),
+      new THREE.MeshStandardMaterial({ map: jordTex, roughness: 1 })
+    );
+    jord.rotation.x = -Math.PI / 2;
+    jord.receiveShadow = true;
+    scene.add(jord);
+
+    // ---------------------------------------------------------------
+    //  Festivalscene i baggrunden (Orange Scene-hyldest)
+    // ---------------------------------------------------------------
+    const scenegruppe = new THREE.Group();
+    scenegruppe.position.set(0, 0, -18);
+
+    // Podie
+    const podie = new THREE.Mesh(
+      new THREE.BoxGeometry(24, 2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: .9 })
+    );
+    podie.position.y = 1;
+    podie.castShadow = podie.receiveShadow = true;
+    scenegruppe.add(podie);
+
+    // Det ikoniske orange sejl / baldakin
+    const sejlMat = new THREE.MeshStandardMaterial({
+      color: 0xff5b00, roughness: .6, side: THREE.DoubleSide,
+      emissive: 0x812c00, emissiveIntensity: .5,
+    });
+
+    function lavSejl(x) {
+      const geo = new THREE.ConeGeometry(6.5, 5, 4, 1, true);
+      const m = new THREE.Mesh(geo, sejlMat);
+      m.rotation.y = Math.PI / 4;
+      m.position.set(x, 9.5, 0);
+      m.scale.set(1, .55, 1);
+      m.castShadow = true;
+      scenegruppe.add(m);
+      // mast
+      const mast = new THREE.Mesh(
+        new THREE.CylinderGeometry(.18, .18, 12, 8),
+        new THREE.MeshStandardMaterial({ color: 0x333, roughness: .5, metalness: .6 })
+      );
+      mast.position.set(x, 6, 0);
+      mast.castShadow = true;
+      scenegruppe.add(mast);
+    }
+    lavSejl(-7);
+    lavSejl(0);
+    lavSejl(7);
+
+    // Bagvæg med tekst
+    const bagCanvas = document.createElement('canvas');
+    bagCanvas.width = 1024; bagCanvas.height = 256;
+    const bx = bagCanvas.getContext('2d');
+    bx.fillStyle = '#0e0e14'; bx.fillRect(0,0,1024,256);
+    bx.fillStyle = '#ff5b00';
+    bx.font = 'bold 150px Segoe UI, sans-serif';
+    bx.textAlign = 'center'; bx.textBaseline = 'middle';
+    bx.fillText('ROSKILDE', 512, 132);
+    const bagTex = new THREE.CanvasTexture(bagCanvas);
+    const bagvaeg = new THREE.Mesh(
+      new THREE.PlaneGeometry(22, 5.5),
+      new THREE.MeshBasicMaterial({ map: bagTex })
+    );
+    bagvaeg.position.set(0, 5.2, -2.9);
+    scenegruppe.add(bagvaeg);
+
+    // Højttalertårne
+    for (const sx of [-13, 13]) {
+      const taarn = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 9, 2.4),
+        new THREE.MeshStandardMaterial({ color: 0x111116, roughness: .8 })
+      );
+      taarn.position.set(sx, 4.5, 1);
+      taarn.castShadow = true;
+      scenegruppe.add(taarn);
+    }
+    scene.add(scenegruppe);
+
+    // Simpelt publikum (lavpoly-hoveder) foran scenen
+    const publikum = new THREE.Group();
+    const hovedGeo = new THREE.SphereGeometry(.35, 8, 8);
+    const kropGeo = new THREE.CapsuleGeometry(.32, .9, 4, 8);
+    const farver = [0x2b6cb0, 0xd53f8c, 0x38a169, 0xdd6b20, 0x805ad5, 0xe53e3e, 0x319795];
+    for (let i = 0; i < 90; i++) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: farver[i % farver.length], roughness: .8 });
+      const krop = new THREE.Mesh(kropGeo, mat);
+      krop.position.y = .8;
+      const hoved = new THREE.Mesh(hovedGeo, new THREE.MeshStandardMaterial({ color: 0xdcae86, roughness: .8 }));
+      hoved.position.y = 1.6;
+      g.add(krop, hoved);
+      g.position.set(
+        (Math.random() - .5) * 26,
+        0,
+        -14 + Math.random() * 7
+      );
+      g.userData.fase = Math.random() * Math.PI * 2;
+      g.castShadow = true;
+      publikum.add(g);
+    }
+    scene.add(publikum);
+
+    // ---------------------------------------------------------------
+    //  Spilleren: en øl-kop
+    // ---------------------------------------------------------------
+    const spiller = new THREE.Group();
+
+    const koppeMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, roughness: .1, transmission: .85, thickness: .6,
+      transparent: true, opacity: .55, ior: 1.3, clearcoat: 1,
+    });
+    const kop = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.05, .8, 2, 32, 1, true),
+      koppeMat
+    );
+    kop.position.y = 1;
+    kop.castShadow = true;
+    spiller.add(kop);
+
+    // Øl inden i
+    const oel = new THREE.Mesh(
+      new THREE.CylinderGeometry(.98, .78, 1.5, 32),
+      new THREE.MeshStandardMaterial({ color: 0xf2a900, roughness: .3, transparent: true, opacity: .92, emissive: 0x5a3d00, emissiveIntensity: .3 })
+    );
+    oel.position.y = .85;
+    spiller.add(oel);
+
+    // Skum-top (mål-fladen for at fange dråber)
+    const skum = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.0, .22, 32),
+      new THREE.MeshStandardMaterial({ color: 0xfff6e0, roughness: 1 })
+    );
+    skum.position.y = 1.62;
+    spiller.add(skum);
+
+    // Bund
+    const bund = new THREE.Mesh(
+      new THREE.CylinderGeometry(.8, .8, .12, 32),
+      koppeMat
+    );
+    bund.position.y = .06;
+    spiller.add(bund);
+
+    spiller.position.set(0, KOP_Y - 1, 6);
+    scene.add(spiller);
+    const KOP_RADIUS = 1.15;
+
+    // ---------------------------------------------------------------
+    //  Regndråbe-pulje
+    // ---------------------------------------------------------------
+    const draabeGeo = new THREE.SphereGeometry(0.22, 12, 12);
+    draabeGeo.scale(1, 1.7, 1);
+    const draabeMat = new THREE.MeshPhysicalMaterial({
+      color: 0x8ecbff, roughness: 0, transmission: .9, thickness: .5,
+      transparent: true, opacity: .8, ior: 1.33, metalness: 0,
+      emissive: 0x1a3a5a, emissiveIntensity: .25,
+    });
+
+    const draaber = [];
+    const MAKS_DRÅBER = 60;
+    for (let i = 0; i < MAKS_DRÅBER; i++) {
+      const m = new THREE.Mesh(draabeGeo, draabeMat);
+      m.castShadow = true;
+      m.visible = false;
+      m.userData.aktiv = false;
+      scene.add(m);
+      draaber.push(m);
+    }
+
+    function spawnDråbe() {
+      const d = draaber.find(x => !x.userData.aktiv);
+      if (!d) return;
+      d.userData.aktiv = true;
+      d.visible = true;
+      d.position.set(
+        (Math.random() - .5) * (GRÆNSE * 2),
+        16 + Math.random() * 4,
+        6
+      );
+      d.userData.vy = 0;
+    }
+
+    // ---------------------------------------------------------------
+    //  Splash-partikler (blå ved fangst)
+    // ---------------------------------------------------------------
+    const splashPart = [];
+    const splashGeo = new THREE.SphereGeometry(0.09, 6, 6);
+    const splashMat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff });
+    for (let i = 0; i < 120; i++) {
+      const p = new THREE.Mesh(splashGeo, splashMat);
+      p.visible = false;
+      scene.add(p);
+      splashPart.push({ mesh: p, liv: 0, v: new THREE.Vector3() });
+    }
+    function lavSplash(pos, farve) {
+      let brugt = 0;
+      for (const p of splashPart) {
+        if (p.liv > 0) continue;
+        p.mesh.position.copy(pos);
+        p.mesh.material = p.mesh.material.clone();
+        p.mesh.material.color.set(farve);
+        p.v.set((Math.random()-.5)*5, 2+Math.random()*4, (Math.random()-.5)*5);
+        p.liv = .6;
+        p.mesh.visible = true;
+        if (++brugt >= 10) break;
+      }
+    }
+
+    // ---------------------------------------------------------------
+    //  Regn-streger i baggrunden (stemning)
+    // ---------------------------------------------------------------
+    const baggrundsRegn = new THREE.Group();
+    const rGeo = new THREE.CylinderGeometry(.02, .02, 1.2, 4);
+    const rMat = new THREE.MeshBasicMaterial({ color: 0xaad4ff, transparent: true, opacity: .35 });
+    const bgDråber = [];
+    for (let i = 0; i < 220; i++) {
+      const m = new THREE.Mesh(rGeo, rMat);
+      m.position.set((Math.random()-.5)*70, Math.random()*30, -6 - Math.random()*30);
+      m.userData.v = 18 + Math.random()*12;
+      baggrundsRegn.add(m);
+      bgDråber.push(m);
+    }
+    scene.add(baggrundsRegn);
+
+    // ---------------------------------------------------------------
+    //  Spil-tilstand
+    // ---------------------------------------------------------------
+    const tilstand = {
+      kører: false,
+      fanget: 0,
+      drik: 0,
+      combo: 0,
+      spawnTimer: 0,
+      spawnInterval: 1.1,
+      tid: 0,
+      tørhed: 100, // regnmåler
+    };
+
+    const MAX_DRIK = 12; // spillet slutter når du har drukket så mange
+
+    // DOM-referencer
+    const scoreEl  = document.getElementById('score-value');
+    const drikEl   = document.getElementById('drik-value');
+    const comboEl  = document.getElementById('combo');
+    const fyldEl   = document.getElementById('maaler-fyld');
+    const flashEl  = document.getElementById('drik-flash');
+    const startOv  = document.getElementById('start');
+    const slutOv   = document.getElementById('slut');
+
+    let comboTimer = null;
+    function visCombo(txt) {
+      comboEl.textContent = txt;
+      comboEl.classList.add('vis');
+      clearTimeout(comboTimer);
+      comboTimer = setTimeout(() => comboEl.classList.remove('vis'), 1400);
+    }
+
+    function drikFlash() {
+      flashEl.classList.remove('slaa');
+      void flashEl.offsetWidth; // reflow => genstart animation
+      flashEl.classList.add('slaa');
+    }
+
+    function opdaterHUD() {
+      scoreEl.textContent = tilstand.fanget;
+      drikEl.textContent = tilstand.drik;
+      fyldEl.style.width = Math.max(0, Math.min(100, tilstand.tørhed)) + '%';
+    }
+
+    // ---------------------------------------------------------------
+    //  Styring (mus / touch / tastatur)
+    // ---------------------------------------------------------------
+    let målX = 0;
+    const tastVenstre = { ned: false }, tastHøjre = { ned: false };
+
+    function pegeTilVerden(klientX) {
+      const nx = (klientX / window.innerWidth) * 2 - 1; // -1..1
+      målX = nx * GRÆNSE;
+    }
+    window.addEventListener('pointermove', e => { if (tilstand.kører) pegeTilVerden(e.clientX); });
+    window.addEventListener('touchmove', e => {
+      if (tilstand.kører && e.touches[0]) { pegeTilVerden(e.touches[0].clientX); e.preventDefault(); }
+    }, { passive: false });
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft')  tastVenstre.ned = true;
+      if (e.key === 'ArrowRight') tastHøjre.ned = true;
+    });
+    window.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft')  tastVenstre.ned = false;
+      if (e.key === 'ArrowRight') tastHøjre.ned = false;
+    });
+
+    // ---------------------------------------------------------------
+    //  Start / genstart / slut
+    // ---------------------------------------------------------------
+    function nulstil() {
+      tilstand.fanget = 0;
+      tilstand.drik = 0;
+      tilstand.combo = 0;
+      tilstand.spawnTimer = 0;
+      tilstand.spawnInterval = 1.1;
+      tilstand.tid = 0;
+      tilstand.tørhed = 100;
+      draaber.forEach(d => { d.userData.aktiv = false; d.visible = false; });
+      målX = 0;
+      spiller.position.x = 0;
+      opdaterHUD();
+    }
+
+    function startSpil() {
+      nulstil();
+      startOv.classList.add('skjul');
+      slutOv.classList.add('skjul');
+      tilstand.kører = true;
+    }
+
+    function slutSpil() {
+      tilstand.kører = false;
+      document.getElementById('slut-fanget').textContent = tilstand.fanget;
+      document.getElementById('slut-drik').textContent = tilstand.drik;
+      let dom;
+      if (tilstand.fanget > tilstand.drik * 3)      dom = 'Imponerende tør! Du er festivalens mest ædru — respekt. 🌂';
+      else if (tilstand.fanget > tilstand.drik)     dom = 'Fin balance mellem fangst og genstande. Solid indsats! 🍺';
+      else if (tilstand.drik < MAX_DRIK)            dom = 'Lidt våd om ørerne, men stadig på benene. 🫧';
+      else                                          dom = 'Helt drivvåd og godt fuld. På tide med en tår vand og en pause! 💧';
+      document.getElementById('dom-slut').textContent = dom;
+      slutOv.classList.remove('skjul');
+    }
+
+    document.getElementById('start-knap').addEventListener('click', startSpil);
+    document.getElementById('igen-knap').addEventListener('click', startSpil);
+
+    // ---------------------------------------------------------------
+    //  Loop
+    // ---------------------------------------------------------------
+    const ur = new THREE.Clock();
+
+    function tick() {
+      const dt = Math.min(ur.getDelta(), 0.05);
+      const t = ur.elapsedTime;
+
+      // Publikum hopper til musikken
+      publikum.children.forEach(p => {
+        p.position.y = Math.abs(Math.sin(t * 3 + p.userData.fase)) * 0.35;
+      });
+
+      // Baggrundsregn falder
+      bgDråber.forEach(m => {
+        m.position.y -= m.userData.v * dt;
+        if (m.position.y < 0) { m.position.y = 26 + Math.random()*6; m.position.x = (Math.random()-.5)*70; }
+      });
+
+      // Pulserende scenelys
+      scenelys.intensity = tilstand.kører ? (2.2 + Math.sin(t*4) * 0.8) : 0.6;
+
+      if (tilstand.kører) {
+        tilstand.tid += dt;
+
+        // Sværhedsgrad stiger
+        tilstand.spawnInterval = Math.max(0.32, 1.1 - tilstand.tid * 0.014);
+        const faldFart = 6.5 + tilstand.tid * 0.09;
+
+        // Spawn
+        tilstand.spawnTimer -= dt;
+        if (tilstand.spawnTimer <= 0) {
+          spawnDråbe();
+          if (tilstand.tid > 25 && Math.random() < 0.4) spawnDråbe(); // dobbelt-dråber senere
+          tilstand.spawnTimer = tilstand.spawnInterval;
+        }
+
+        // Styr kop med tastatur
+        if (tastVenstre.ned) målX -= 14 * dt;
+        if (tastHøjre.ned)   målX += 14 * dt;
+        målX = Math.max(-GRÆNSE, Math.min(GRÆNSE, målX));
+
+        // Blødt følg
+        spiller.position.x += (målX - spiller.position.x) * Math.min(1, dt * 12);
+        // Lille tilt i bevægelsesretningen
+        const hast = (målX - spiller.position.x);
+        spiller.rotation.z = THREE.MathUtils.clamp(-hast * 0.12, -0.3, 0.3);
+
+        // Regnmåler tørrer langsomt ud (tvinger dig til at fange)
+        tilstand.tørhed -= dt * 3.5;
+        if (tilstand.tørhed <= 0) {
+          // for tør => du spilder og må drikke
+          tilstand.tørhed = 100;
+          registrérDrik();
+        }
+
+        // Opdater dråber
+        for (const d of draaber) {
+          if (!d.userData.aktiv) continue;
+          d.userData.vy += faldFart * dt;              // "tyngdekraft"
+          d.position.y -= (faldFart + d.userData.vy) * dt * 0.5;
+          d.rotation.y += dt * 2;
+
+          // Fanget i koppen?
+          if (d.position.y <= KOP_Y + 0.3 && d.position.y > GULV_Y) {
+            const dx = d.position.x - spiller.position.x;
+            if (Math.abs(dx) < KOP_RADIUS) {
+              d.userData.aktiv = false; d.visible = false;
+              registrérFangst(d.position.clone());
+              continue;
+            }
+          }
+
+          // Ramt jorden => misset => DRIK
+          if (d.position.y <= GULV_Y + 0.1) {
+            d.userData.aktiv = false; d.visible = false;
+            lavSplash(new THREE.Vector3(d.position.x, 0.15, d.position.z), 0x6b4a2a);
+            registrérDrik();
+          }
+        }
+      }
+
+      // Splash-partikler
+      for (const p of splashPart) {
+        if (p.liv <= 0) continue;
+        p.liv -= dt;
+        p.v.y -= 14 * dt;
+        p.mesh.position.addScaledVector(p.v, dt);
+        p.mesh.scale.setScalar(Math.max(0.01, p.liv * 1.6));
+        if (p.liv <= 0) p.mesh.visible = false;
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+
+    function registrérFangst(pos) {
+      tilstand.fanget++;
+      tilstand.combo++;
+      tilstand.tørhed = Math.min(100, tilstand.tørhed + 12);
+      lavSplash(new THREE.Vector3(spiller.position.x, KOP_Y, spiller.position.z), 0x8ecbff);
+      // lille "hop" på øl-niveauet
+      oel.scale.y = 1.12; setTimeout(() => oel.scale.y = 1, 90);
+      if (tilstand.combo > 0 && tilstand.combo % 5 === 0) visCombo('🔥 ' + tilstand.combo + ' i træk — skål!');
+      opdaterHUD();
+    }
+
+    function registrérDrik() {
+      tilstand.drik++;
+      tilstand.combo = 0;
+      drikFlash();
+      opdaterHUD();
+      if (tilstand.drik >= MAX_DRIK) slutSpil();
+    }
+
+    // ---------------------------------------------------------------
+    //  Resize
+    // ---------------------------------------------------------------
+    function resize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    opdaterHUD();
+    tick();
+  </script>
+
+</body>
+</html>
